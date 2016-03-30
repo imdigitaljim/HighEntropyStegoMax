@@ -1,11 +1,10 @@
 #include "wavmod.h"
 #define WAVDATASTART 43
-#define MAGICNUMBER 299009
-WAV::WAV(string filename, string img)
+#define STEGMODIFIER 32 //since 8 bits per byte, only 1 byte of 2 can be modified, only 1/2 the bits can be taken = 8 * 2 * 2 = 32
+
+WAV::WAV(string filename)
 {	
-	ifstream imgstream(img, ios::ate | ios::binary);
 	ifstream wavstream(filename, ios::ate | ios::binary);
-	img_file_size = imgstream.tellg();
 	wav_file_size = wavstream.tellg();
 	wavstream.close();
 	ifstream wav_file(filename, ios::binary);
@@ -22,138 +21,155 @@ WAV::WAV(string filename, string img)
 		}
 		catch (const exception& e)
 		{
-			cerr << filename << ": not a valid wav" << endl;
+			cerr << ERROR << filename << ": not a valid wav." << endl;
+			return;
 		}
 		wav_file.close();
 	}
 	else
 	{
-		cerr << filename << " failed to open" << endl;
+		cerr << ERROR << filename << ": failed to open." << endl;
+		return;
 	}
 	file_name = filename;
-	img_name = img;
-	cout << "SIZE NEEDED: " << img_file_size * 8 * 2 * 2 << " of " << data_size << endl;
-	if (img_file_size * 8 * 2 * 2 < data_size) //change this data_size to the amount hideable
-	{
-		HideFile();
-		cout << "EXTRACTING" << endl;
-		ExtractFile("myimg.img",string(file_name + ".wav"));
-	}
-	else
-	{
-		cerr << filename << ": too small to hide image: " << img << endl;
-	}
+	cout << UPDATEBAR << filename << ": metadata verified." << endl;
 }
-bool WAV::HideFile()
+
+bool WAV::SetHiddenFileMetaData(string img)
 {
-	string file_copy = file_name + ".wav";
-	cout << "COPYING FILE " << file_copy << endl;
-	ifstream wav_file(file_name, ios::binary);
-	ofstream copy(file_copy, ios::binary|ios::out);
-	copy << wav_file.rdbuf();
-	wav_file.close();
-	copy.close();
-	fstream output(file_copy, ios::in | ios::out | ios::binary);
-	fstream imgstream(img_name, ios::in | ios::out | ios::binary);
-	if (output.is_open() && imgstream.is_open())
-	{ 	
-		output.seekp(WAVDATASTART, ios::beg); //where data begins
-		unsigned char readCH, writeCH = 0, imgreadCH, temp;
-		size_t pos = output.tellp();
-		size_t write = 0;
-		//size_t checkValue = 132093;
-		while (imgstream.good())
-		{
-			//if (write > checkValue && write < checkValue + 10) cout << endl << "##############" << write << "#################" <<  endl;
-			//first bits
-			readCH = 0;
-			output.read((char*)&readCH, sizeof(char));
-			output.read((char*)&readCH, sizeof(char));
-			//if (write > checkValue && write < checkValue + 10) cout << static_cast<int>(readCH) << "=read|";
-			writeCH = ((readCH >> 4) << 4);
-			//if (write > checkValue && write < checkValue + 10)  cout << static_cast<int>(writeCH) << "=shifted|";
-			imgstream.read((char*)&imgreadCH, sizeof(char));
-			//if (write > checkValue && write < checkValue + 10)  cout << static_cast<int>(imgreadCH) << "=img|";
-			temp = (imgreadCH << 4);
-			//if (write > checkValue && write < checkValue + 10)  cout << static_cast<int>(temp) << "=temp|";
-			writeCH |= (temp >> 4);
-			pos = output.tellp();
-			output.seekp(pos - 1);
-			output.write((char*)&writeCH, sizeof(char));
-			//if (write > checkValue && write < checkValue + 10)  cout << static_cast<int>(writeCH) << "=write|" << endl;
-			
-			
-			//output.seekp(pos - 1);
-			//output.read((char*)&readCH, sizeof(char));
-			//if (write > checkValue && write < checkValue + 10)  cout << static_cast<int>(readCH) << "=readagain|" << endl;
-
-			
-			//second bits
-			readCH = 0;
-			output.read((char*)&readCH, sizeof(char));
-			output.read((char*)&readCH, sizeof(char));
-			//if (write > checkValue && write < checkValue + 10)  cout << static_cast<int>(readCH) << "=read|";
-			temp = (readCH >> 4);
-			writeCH = (temp << 4);
-			writeCH |= (imgreadCH >> 4);
-			
-			pos = output.tellp();
-			output.seekp(pos - 1);
-			output.write((char*)&writeCH, sizeof(char));
-
-			output.seekp(pos - 1);
-			output.write((char*)&writeCH, sizeof(char));
-			//if (write > checkValue && write < checkValue + 10)  cout << static_cast<int>(writeCH) << "=write|" << endl;
-			
-			output.seekp(pos - 1);
-			output.read((char*)&readCH, sizeof(char));
-			//if (write > checkValue && write < checkValue + 10)  cout << static_cast<int>(readCH) << "=readagain|" << endl;
-			
-			write++;
-		}
-		cout << "DONE: " << write << " # of modifications" << endl;
-		output.close();
-		imgstream.close();
+	ifstream imgstream(img, ios::ate | ios::binary);
+	img_file_size = imgstream.tellg();
+	imgstream.close();
+	img_name = img;
+	if (img_file_size * STEGMODIFIER > data_size) 
+	{
+		cerr << ERROR << file_name << ": too small to hide image: " << img << endl;
+		return false;
 	}
 	return true;
 }
 
-bool WAV::ExtractFile(string new_img, string wav_file)
+
+bool WAV::HideFile(string wav_file, string img_name)
 {
+	//set metadata
+	*this = WAV(wav_file);
+	if (!SetHiddenFileMetaData(img_name)) return false;
+
+	//copy wav file
+	string file_copy = file_name + ".wav";
+	ifstream wavfilestream(file_name, ios::binary);
+	ofstream copy(file_copy, ios::binary|ios::out);
+	copy << wavfilestream.rdbuf();
+	wavfilestream.close();
+	copy.close();
+
+	//begin injection process
+	fstream output(file_copy, ios::in | ios::out | ios::binary);
+	fstream imgstream(img_name, ios::in | ios::out | ios::binary);
+	if (output.is_open() && imgstream.is_open())
+	{ 	
+		cout << UPDATEBAR << file_copy << ": creating file copy." << endl;
+		output.seekp(WAVDATASTART, ios::beg); //where data section begins
+		unsigned char readCH, writeCH, imgreadCH, temp;
+		size_t write = 0, pos = output.tellp();
+		while (imgstream.good())
+		{
+			try 
+			{
+				//inject 4 most significant bits
+				output.read((char*)&readCH, sizeof(char));
+				output.read((char*)&readCH, sizeof(char));
+				writeCH = ((readCH >> 4) << 4);
+				imgstream.read((char*)&imgreadCH, sizeof(char));
+				temp = (imgreadCH << 4);
+				writeCH |= (temp >> 4);
+				pos = output.tellp();
+				output.seekp(pos - 1);
+				output.write((char*)&writeCH, sizeof(char));
+				
+				//inject 4 least significant bits
+				output.read((char*)&readCH, sizeof(char));
+				output.read((char*)&readCH, sizeof(char));
+
+				temp = (readCH >> 4);
+				writeCH = (temp << 4);
+				writeCH |= (imgreadCH >> 4);
+				
+				pos = output.tellp();
+				output.seekp(pos - 1);
+				output.write((char*)&writeCH, sizeof(char));
+			
+				write++;
+			}
+			catch (const exception& e)
+			{
+				cerr << ERROR << wav_file << ": file corrupt." << endl;
+				output.close();
+				imgstream.close();
+				return false;	
+			}
+		}
+		cout << UPDATEBAR << file_copy << ": injection completed - ";
+		cout << write - 1 << " of " << img_file_size << " bytes." << endl;
+		
+		output.close();
+		imgstream.close();
+		return true;
+	}
+	return false;
+}
+
+bool WAV::ExtractFile(string wav_file, string new_img, unsigned long bytes)
+{
+	*this = WAV(wav_file);
+	if (bytes * STEGMODIFIER > data_size) 
+	{
+		cerr << ERROR << wav_file << ": extraction of " << bytes << " bytes is not possible." << endl;
+		return false;
+	}
+	
 	fstream output(new_img, ios::out | ios::binary);
 	fstream extract_stream(wav_file, ios::in | ios::out | ios::binary);
 	if (output.is_open() && extract_stream.is_open())
 	{ 	
 		extract_stream.seekp(WAVDATASTART, ios::beg); //where data begins
-		unsigned char readCH, writeCH = 0, temp;
+		unsigned char readCH, writeCH, temp;
 		size_t write = 0;
-		//size_t checkValue = 132093;
-		while (MAGICNUMBER > write)
+		while (write < bytes)
 		{
-			//first bits
-			readCH = 0;
-			extract_stream.read((char*)&readCH, sizeof(char));
-			extract_stream.read((char*)&readCH, sizeof(char));
-			//if (write > checkValue && write < checkValue + 10)  cout << static_cast<int>(readCH) << "=read(1st4)|";
-			temp = (readCH << 4);
-			writeCH = (temp >> 4);
-			readCH = 0;
-			extract_stream.read((char*)&readCH, sizeof(char));
-			extract_stream.read((char*)&readCH, sizeof(char));
-			//if (write > checkValue && write < checkValue + 10)  cout << static_cast<int>(readCH) << "=read2(2nd4)|";
-			writeCH |= (readCH << 4);
-			output.write((char*)&writeCH, sizeof(char));
-			//if (write > checkValue && write < checkValue + 10)  cout << static_cast<int>(writeCH) << endl;
-			write++;
+			try
+			{
+				//extract 4 most significant bits
+				extract_stream.read((char*)&readCH, sizeof(char));
+				extract_stream.read((char*)&readCH, sizeof(char));
+				temp = (readCH << 4);
+				writeCH = (temp >> 4);
+				
+				//extract 4 least significant bits
+				extract_stream.read((char*)&readCH, sizeof(char));
+				extract_stream.read((char*)&readCH, sizeof(char));
+				writeCH |= (readCH << 4);
+				output.write((char*)&writeCH, sizeof(char));
+				write++;
+				if (!extract_stream.good()) break;
+			}
+			catch (const exception& e)
+			{
+				cerr << ERROR << wav_file << ": file corrupt." << endl;
+				output.close();
+				extract_stream.close();
+				return false;	
+			}
 		}
-		cout << "DONE: " << write << " # of modifications" << endl;
+		cout << UPDATEBAR << new_img << ": extraction completed - ";
+		cout << write << " of " << bytes << " bytes." << endl;		
 		output.close();
 		extract_stream.close();
+		return true;
 	}	
-	return true;
+	return false;
 }
-
-
 
 void WAV::SetChunkStrings()
 {
@@ -165,16 +181,16 @@ void WAV::SetChunkStrings()
 	memcpy(fmt_id, fchunk.id, IDSIZE - 1);
 	fmt_id[IDSIZE - 1] = 0;
 }
-void WAV::PrintAll() const
+void WAV::PrintMetaData() const
 {
-	cout << "All chunks for {" << file_name << "}" << endl; 
-	cout << "=============" << endl;
+	cout << BR;
+	cout << "{" << file_name << "} METADATA" << BR; 
 	PrintRiff();
-	cout << "=============" << endl;
+	cout << BR;
 	PrintFmt();
-	cout << "=============" << endl;
+	cout << BR;
 	PrintData();
-	cout << "=============" << endl;
+	cout << BR;
 }
 
 void WAV::PrintRiff() const

@@ -7,7 +7,9 @@
 #include <string>
 #include <endian.h>
 #define IDSIZE 5
-
+#define BR "\n===============================================================================\n"
+#define UPDATEBAR ">>>> "
+#define ERROR "<ERROR>: "
 using namespace std;
 
 struct __attribute((packed)) riff_chunk
@@ -37,15 +39,17 @@ class FileMod{
 class WAV : public FileMod
 {
 	public:
-		WAV(string filename, string img);
+		WAV(){}
+		WAV(string filename);
+
+		void PrintMetaData() const;		
+		bool HideFile(string wav_file, string img_name);
+		bool ExtractFile(string wav_file, string new_img, unsigned long bytes);
+	private:
 		void PrintRiff() const;
 		void PrintFmt() const;
 		void PrintData() const;
-		void PrintAll() const;
-		void BruteForceEditGen(size_t start = 0, size_t len = 1); //creates n files by modifying the first n bytes
-		bool HideFile();
-		bool ExtractFile(string new_img, string wav_file);
-	private:
+		bool SetHiddenFileMetaData(string img);
 		string GetCompressionMessage() const;
 		string GetChannelMessage() const;
 		void SetChunkStrings();
