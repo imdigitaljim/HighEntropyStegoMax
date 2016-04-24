@@ -31,12 +31,8 @@ struct __attribute((packed)) fmt_chunk
 	unsigned short bitsPerSample;
 };
 
-class FileMod{
-	private:
-	public:
-	protected:
-};
-class WAV : public FileMod
+
+class WAV
 {
 	public:
 		WAV(){}
@@ -66,5 +62,6 @@ class WAV : public FileMod
 		size_t wav_file_size;
 		size_t img_file_size;
 };
+
 
 #endif

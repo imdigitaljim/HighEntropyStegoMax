@@ -1,6 +1,6 @@
 #include "wavmod.h"
 #define WAVDATASTART 43
-#define STEGMODIFIER 32 //since 8 bits per byte, only 1 byte of 2 can be modified, only 1/2 the bits can be taken = 8 * 2 * 2 = 32
+#define STEGMODIFIER 4 //only 1 byte of 2 can be modified, only 1/2 the bits can be taken = 2 * 2 = 4
 
 WAV::WAV(string filename)
 {	

@@ -1,0 +1,47 @@
+#!/bin/bash
+
+type veracrypt >/dev/null 2>&1 || 
+{
+	echo "Missing Dependencies...\n"
+	while true; do
+	    read -p "Do you wish to install dependencies?" yn
+	    case $yn in
+		[Yy]* ) 
+			echo >&2 "Missing Dependency: VeraCrypt\n"; 
+			sudo wget http://sourceforge.net/projects/veracrypt/files/VeraCrypt%201.12/veracrypt-1.12-setup.tar.bz2;
+			bzip2 -d veracrypt-1.12-setup.tar.bz2;
+			tar -xvf veracrypt-1.12-setup.tar;
+			rm -f veracrypt-1.12-setup.*;
+			veracrypt-1.12-setup-console-x64;
+			rm -f veracrypt-1.12-setup-console*;
+			type veracrypt >/dev/null 2>&1 ||
+			{
+				echo "Failed to detect dependencies... exiting...";
+				exit 1;	
+			}
+			break;;
+		[Nn]* ) exit;;
+		* ) echo "Please answer yes or no.";;
+	    esac
+	done
+
+}
+while true; do
+    read -p "Do you wish to create a new file system image (uses minimum settings)?" yn
+    case $yn in
+	[Yy]* ) 
+		veracrypt --create --volume-type=Normal --size=300000 --encryption=AES --filesystem=FAT --hash=SHA-512;
+		break;;
+	[Nn]* ) 
+
+		break;;
+	* ) echo "Please answer yes or no.";;
+    esac
+done
+echo "============================================================================" 
+echo "VeraCrypt Commands:"
+echo "Create custom image   Usage: 'veracrypt --create'"
+echo "Mount image           Usage: 'veracrypt --mount <volume> <mountpoint>"
+echo "============================================================================" 
+make stegomax;
+stegomax;

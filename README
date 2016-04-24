@@ -1,0 +1,14 @@
+Project Submission
+COP5611 Advanced Operating Systems
+StegoMax Steganography
+
+James Bach, Jonathan Smith
+
+Compilable on linprog using make
+
+base script called verascript requires sudo privilege,
+resolves dependencies and steps through veracrypt to make a volume
+and provides an entry point for stegomax
+
+
+type 'stegomax' to run
